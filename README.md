@@ -24,7 +24,7 @@ This project implements token-based authentication via Laravel Sanctum and custo
    git clone [https://github.com/Cordero5/laravel13-secure-api-lab.git](https://github.com/Cordero5/laravel13-secure-api-lab.git)
    type:cd demo-api
    
-   <--optional if you don't have 8.3 version-->
+   <--optional_if_you_don't_have_8.3_version-->
    (https://www.php.net/downloads.php?os=windows&osvariant=windows-downloads&version=8.3)
    VS16 x64 Thread Safe | Zip:32.75MB
    Exactall | Name_it_php83
