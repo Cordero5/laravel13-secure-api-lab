@@ -22,5 +22,4 @@ This project implements token-based authentication via Laravel Sanctum and custo
 1. **Clone the Repository:**
    ```bash
    git clone [https://github.com/Cordero5/laravel13-secure-api-lab.git](https://github.com/Cordero5/laravel13-secure-api-lab.git)
-   cd laravel13-secure-api-lab
    cd demo-api
