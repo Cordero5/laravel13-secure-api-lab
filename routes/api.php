@@ -18,4 +18,22 @@ Route::post('/login', [AuthController::class, 'login'])
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/profile', [AuthController::class, 'profile']);
     Route::post('/logout', [AuthController::class, 'logout']);
+
+    // RBAC Protected Routes
+    Route::get('/students', function () {
+        return response()->json([
+            'students' => [
+                ['id' => 1, 'name' => 'ALFRED CORDERO'],
+                ['id' => 2, 'name' => 'PRINCESS PERUDA']
+            ]
+        ]);
+    })->middleware('role:admin,student');
+
+    Route::get('/admin/dashboard', function () {
+        return response()->json(['message' => 'Welcome Admin!']);
+    })->middleware('admin');
+
+    Route::get('/student/dashboard', function () {
+        return response()->json(['message' => 'Welcome Student!']);
+    })->middleware('role:student');
 });
