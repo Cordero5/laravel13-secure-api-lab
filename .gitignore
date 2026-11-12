@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 *.log
 .DS_Store
 .env
@@ -22,3 +23,18 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+=======
+# Repository-wide ignores. The application halves keep their own files:
+# backend/.gitignore (which is what holds backend/.env out of the commit) and
+# mobile-app/.gitignore (node_modules, .expo, generated native folders).
+
+# Operating-system leftovers
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Written on every run by evidence/capture-browser-matrix.cjs. The graded
+# captures one level up in evidence/screenshots/ are the ones that are
+# committed; this folder is scratch.
+evidence/screenshots/auto/
+>>>>>>> 2769a00 (Implement RBAC with custom middleware)

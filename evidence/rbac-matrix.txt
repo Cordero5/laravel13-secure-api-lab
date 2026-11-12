@@ -1,0 +1,365 @@
+RBAC AUTHORIZATION MATRIX
+Captured : 2026-11-13 02:25:01
+Base URL : http://127.0.0.1:8000/api
+Roles    : admin, tenant (users.role)
+Accounts : evidence.admin@example.com and evidence.tenant@example.com - throwaway accounts this script
+           created and deletes again, used because no BHMS_*_PASSWORD was
+           set. The role each holds is the same one the real accounts have.
+
+Note: /api/login checks the password only, so it issues a token to a staff
+account too. That is deliberate - without it there would be no way to
+demonstrate an allowed admin request. The panel is the role-gated door, and
+the browser captures show that.
+
+Probe rows this run owns: room 28, tenant 79, payment 22.
+The probe tenant lives in the probe room, which is what makes that room
+'occupied' for the business-rule test in Part 5.
+
+==============================================================
+PART 1 - anonymous caller (authentication has not happened)
+==============================================================
+auth:sanctum runs first, so there is no role to check and 401 is correct.
+
+--------------------------------------------------------------
+No token at all -> expect 401
+$ curl -X GET http://127.0.0.1:8000/api/admin/overview -H 'Content-Type: application/json' -H 'Accept: application/json'
+HTTP 401
+{"message":"Unauthenticated."}
+=> 401, as expected
+
+--------------------------------------------------------------
+No token at all, POST /api/rooms -> expect 401
+$ curl -X POST http://127.0.0.1:8000/api/rooms -H 'Content-Type: application/json' -H 'Accept: application/json' -d '{}'
+HTTP 401
+{"message":"Unauthenticated."}
+=> 401, as expected
+
+==============================================================
+PART 2 - TENANT token (evidence.tenant@example.com, role: tenant)
+==============================================================
+--------------------------------------------------------------
+GET /api/admin/overview  [auth:sanctum + admin]             -> expect 403
+$ curl -X GET http://127.0.0.1:8000/api/admin/overview -H 'Content-Type: application/json' -H 'Accept: application/json' -H 'Authorization: Bearer <token>'
+HTTP 403
+{"message":"Forbidden. Administrator access is required.","your_role":"tenant"}
+=> 403, as expected
+
+--------------------------------------------------------------
+GET /api/tenant/summary  [auth:sanctum + role:tenant]       -> expect 200
+$ curl -X GET http://127.0.0.1:8000/api/tenant/summary -H 'Content-Type: application/json' -H 'Accept: application/json' -H 'Authorization: Bearer <token>'
+HTTP 200
+{"message":"Welcome, Tenant","access":"tenant","granted_to":"evidence.tenant@example.com","tenant":{"name":"Evidence Tenant","room":null,"payments":0}}
+=> 200, as expected
+
+--------------------------------------------------------------
+GET /api/house/rooms     [auth:sanctum + role:admin,tenant] -> expect 200
+$ curl -X GET http://127.0.0.1:8000/api/house/rooms -H 'Content-Type: application/json' -H 'Accept: application/json' -H 'Authorization: Bearer <token>'
+HTTP 200
+{"message":"Room list is open to staff and boarders","access":"tenant","rooms":[{"id":10,"room_number":"101","room_type":"single","price":"2000.00","capacity":1,"status":"occupied","occupancy":1,"available_slots":0,"is_full":true},{"id":11,"room_number":"102","room_type":"double","price":"1500.00","capacity":4,"status":"available","occupancy":0,"available_slots":4,"is_full":false},{"id":12,"room_number":"103","room_type":"single","price":"3000.00","capacity":1,"status":"available","occupancy":0,"available_slots":1,"is_full":false},{"id":28,"room_number":"EVIDENCE-999","room_type":"single","price":"1000.00","capacity":2,"status":"available","occupancy":1,"available_slots":1,"is_full":false}]}
+=> 200, as expected
+
+==============================================================
+PART 3 - ADMIN token (evidence.admin@example.com, role: admin)
+==============================================================
+--------------------------------------------------------------
+GET /api/admin/overview  [auth:sanctum + admin]             -> expect 200
+$ curl -X GET http://127.0.0.1:8000/api/admin/overview -H 'Content-Type: application/json' -H 'Accept: application/json' -H 'Authorization: Bearer <token>'
+HTTP 200
+{"message":"Welcome, Administrator","access":"admin","granted_to":"evidence.admin@example.com","house":{"rooms":4,"occupied_rooms":1,"tenants":5,"collected":5000,"outstanding":0}}
+=> 200, as expected
+
+--------------------------------------------------------------
+GET /api/tenant/summary  [auth:sanctum + role:tenant]       -> expect 403
+$ curl -X GET http://127.0.0.1:8000/api/tenant/summary -H 'Content-Type: application/json' -H 'Accept: application/json' -H 'Authorization: Bearer <token>'
+HTTP 403
+{"message":"Forbidden. This endpoint requires one of these roles: tenant.","your_role":"admin"}
+=> 403, as expected
+
+--------------------------------------------------------------
+GET /api/house/rooms     [auth:sanctum + role:admin,tenant] -> expect 200
+$ curl -X GET http://127.0.0.1:8000/api/house/rooms -H 'Content-Type: application/json' -H 'Accept: application/json' -H 'Authorization: Bearer <token>'
+HTTP 200
+{"message":"Room list is open to staff and boarders","access":"admin","rooms":[{"id":10,"room_number":"101","room_type":"single","price":"2000.00","capacity":1,"status":"occupied","occupancy":1,"available_slots":0,"is_full":true},{"id":11,"room_number":"102","room_type":"double","price":"1500.00","capacity":4,"status":"available","occupancy":0,"available_slots":4,"is_full":false},{"id":12,"room_number":"103","room_type":"single","price":"3000.00","capacity":1,"status":"available","occupancy":0,"available_slots":1,"is_full":false},{"id":28,"room_number":"EVIDENCE-999","room_type":"single","price":"1000.00","capacity":2,"status":"available","occupancy":1,"available_slots":1,"is_full":false}]}
+=> 200, as expected
+
+==============================================================
+PART 4 - restricted ACTION denied by role (create / update / delete)
+==============================================================
+The write routes run the same controllers the admin panel uses, so a
+boarder token must be stopped by the admin alias before any method runs.
+The table state printed after these eight attempts is the proof: denied,
+and nothing changed.
+
+--------------------------------------------------------------
+State BEFORE the denied attempts:
++----+--------------+-----------+---------+----------+-----------+
+| id | room_number  | room_type | price   | capacity | status    |
++----+--------------+-----------+---------+----------+-----------+
+| 10 | 101          | single    | 2000.00 |        1 | occupied  |
+| 11 | 102          | double    | 1500.00 |        4 | available |
+| 12 | 103          | single    | 3000.00 |        1 | available |
+| 28 | EVIDENCE-999 | single    | 1000.00 |        2 | available |
++----+--------------+-----------+---------+----------+-----------+
++-------+---------+----------+
+| rooms | tenants | payments |
++-------+---------+----------+
+|     4 |       5 |        3 |
++-------+---------+----------+
+
+--------------------------------------------------------------
+TENANT POST   /api/rooms                -> expect 403
+$ curl -X POST http://127.0.0.1:8000/api/rooms -H 'Content-Type: application/json' -H 'Accept: application/json' -H 'Authorization: Bearer <token>' -d '{"room_number":"EVIDENCE-888","room_type":"single","price":1,"capacity":1}'
+HTTP 403
+{"message":"Forbidden. Administrator access is required.","your_role":"tenant"}
+=> 403, as expected
+
+--------------------------------------------------------------
+TENANT PUT    /api/rooms/28          -> expect 403
+$ curl -X PUT http://127.0.0.1:8000/api/rooms/28 -H 'Content-Type: application/json' -H 'Accept: application/json' -H 'Authorization: Bearer <token>' -d '{"room_number":"EVIDENCE-999","room_type":"TAMPERED","price":1,"capacity":1}'
+HTTP 403
+{"message":"Forbidden. Administrator access is required.","your_role":"tenant"}
+=> 403, as expected
+
+--------------------------------------------------------------
+TENANT DELETE /api/rooms/28          -> expect 403
+$ curl -X DELETE http://127.0.0.1:8000/api/rooms/28 -H 'Content-Type: application/json' -H 'Accept: application/json' -H 'Authorization: Bearer <token>'
+HTTP 403
+{"message":"Forbidden. Administrator access is required.","your_role":"tenant"}
+=> 403, as expected
+
+--------------------------------------------------------------
+TENANT POST   /api/tenants              -> expect 403
+$ curl -X POST http://127.0.0.1:8000/api/tenants -H 'Content-Type: application/json' -H 'Accept: application/json' -H 'Authorization: Bearer <token>' -d '{"name":"Evidence Intruder","email":"intruder@example.com","phone":"0911111111","room_id":28}'
+HTTP 403
+{"message":"Forbidden. Administrator access is required.","your_role":"tenant"}
+=> 403, as expected
+
+--------------------------------------------------------------
+TENANT DELETE /api/tenants/79    -> expect 403
+$ curl -X DELETE http://127.0.0.1:8000/api/tenants/79 -H 'Content-Type: application/json' -H 'Accept: application/json' -H 'Authorization: Bearer <token>'
+HTTP 403
+{"message":"Forbidden. Administrator access is required.","your_role":"tenant"}
+=> 403, as expected
+
+--------------------------------------------------------------
+TENANT POST   /api/payments             -> expect 403
+$ curl -X POST http://127.0.0.1:8000/api/payments -H 'Content-Type: application/json' -H 'Accept: application/json' -H 'Authorization: Bearer <token>' -d '{"tenant_id":79,"amount":1,"payment_date":"2026-11-01","status":"paid"}'
+HTTP 403
+{"message":"Forbidden. Administrator access is required.","your_role":"tenant"}
+=> 403, as expected
+
+--------------------------------------------------------------
+TENANT PUT    /api/payments/22    -> expect 403
+$ curl -X PUT http://127.0.0.1:8000/api/payments/22 -H 'Content-Type: application/json' -H 'Accept: application/json' -H 'Authorization: Bearer <token>' -d '{"status":"pending"}'
+HTTP 403
+{"message":"Forbidden. Administrator access is required.","your_role":"tenant"}
+=> 403, as expected
+
+--------------------------------------------------------------
+TENANT DELETE /api/payments/22    -> expect 403
+$ curl -X DELETE http://127.0.0.1:8000/api/payments/22 -H 'Content-Type: application/json' -H 'Accept: application/json' -H 'Authorization: Bearer <token>'
+HTTP 403
+{"message":"Forbidden. Administrator access is required.","your_role":"tenant"}
+=> 403, as expected
+
+--------------------------------------------------------------
+State AFTER the denied attempts - identical. Action denied, no unauthorized change:
++----+--------------+-----------+---------+----------+-----------+
+| id | room_number  | room_type | price   | capacity | status    |
++----+--------------+-----------+---------+----------+-----------+
+| 10 | 101          | single    | 2000.00 |        1 | occupied  |
+| 11 | 102          | double    | 1500.00 |        4 | available |
+| 12 | 103          | single    | 3000.00 |        1 | available |
+| 28 | EVIDENCE-999 | single    | 1000.00 |        2 | available |
++----+--------------+-----------+---------+----------+-----------+
++-------+---------+----------+
+| rooms | tenants | payments |
++-------+---------+----------+
+|     4 |       5 |        3 |
++-------+---------+----------+
+
+==============================================================
+PART 5 - the same ACTION allowed for admin, and the rules it obeys
+==============================================================
+This is what makes Part 4 meaningful: the guard is selective, not a blanket
+block on writes. The 422 and the 409 are the panel's own validation and
+occupancy rules, which a staff request has to satisfy over JSON too. Every
+row here is one this script inserted.
+
+--------------------------------------------------------------
+ADMIN POST   /api/rooms                -> expect 201
+$ curl -X POST http://127.0.0.1:8000/api/rooms -H 'Content-Type: application/json' -H 'Accept: application/json' -H 'Authorization: Bearer <token>' -d '{"room_number":"EVIDENCE-777","room_type":"single","price":900,"capacity":1}'
+HTTP 201
+{"message":"Room EVIDENCE-777 added successfully.","room":{"id":29,"room_number":"EVIDENCE-777","room_type":"single","price":"900.00","capacity":1,"status":"available","occupancy":0,"available_slots":1,"is_full":false}}
+=> 201, as expected
+
+--------------------------------------------------------------
+ADMIN POST   /api/rooms (duplicate #)    -> expect 422 validation
+$ curl -X POST http://127.0.0.1:8000/api/rooms -H 'Content-Type: application/json' -H 'Accept: application/json' -H 'Authorization: Bearer <token>' -d '{"room_number":"EVIDENCE-777","room_type":"single","price":900,"capacity":1}'
+HTTP 422
+{"message":"That room number already exists.","errors":{"room_number":["That room number already exists."]}}
+=> 422, as expected
+
+--------------------------------------------------------------
+ADMIN PUT    /api/rooms/29        -> expect 200
+$ curl -X PUT http://127.0.0.1:8000/api/rooms/29 -H 'Content-Type: application/json' -H 'Accept: application/json' -H 'Authorization: Bearer <token>' -d '{"room_number":"EVIDENCE-777","room_type":"deluxe","price":1200,"capacity":3}'
+HTTP 200
+{"message":"Room EVIDENCE-777 updated successfully.","room":{"id":29,"room_number":"EVIDENCE-777","room_type":"deluxe","price":"1200.00","capacity":3,"status":"available","occupancy":0,"available_slots":3,"is_full":false}}
+=> 200, as expected
+
+--------------------------------------------------------------
+ADMIN PUT    /api/payments/22 -> expect 200
+$ curl -X PUT http://127.0.0.1:8000/api/payments/22 -H 'Content-Type: application/json' -H 'Accept: application/json' -H 'Authorization: Bearer <token>' -d '{"amount":1100,"status":"pending"}'
+HTTP 200
+{"message":"Payment updated successfully","payment":{"id":22,"tenant_id":79,"amount":"1100.00","payment_date":"2026-11-01","status":"pending","reference_number":"EVIDENCE-PROOF","created_at":"2026-11-13T02:25:04.000000Z","updated_at":"2026-11-12T18:25:58.000000Z"}}
+=> 200, as expected
+
+--------------------------------------------------------------
+ADMIN GET    /api/payments/22 -> read back, amount really is 1100
+$ curl -X GET http://127.0.0.1:8000/api/payments/22 -H 'Content-Type: application/json' -H 'Accept: application/json' -H 'Authorization: Bearer <token>'
+HTTP 200
+{"id":22,"tenant_id":79,"amount":"1100.00","payment_date":"2026-11-01","status":"pending","reference_number":"EVIDENCE-PROOF","created_at":"2026-11-13T02:25:04.000000Z","updated_at":"2026-11-12T18:25:58.000000Z","tenant":{"id":79,"name":"Evidence Probe"}}
+=> 200, as expected
+
+--------------------------------------------------------------
+ADMIN DELETE /api/rooms/28      -> expect 409, the probe tenant still lives there
+$ curl -X DELETE http://127.0.0.1:8000/api/rooms/28 -H 'Content-Type: application/json' -H 'Accept: application/json' -H 'Authorization: Bearer <token>'
+HTTP 409
+{"message":"Room EVIDENCE-999 still has tenants assigned. Unassign them first."}
+=> 409, as expected
+
+--------------------------------------------------------------
+ADMIN DELETE /api/tenants/79  -> expect 200, room now empty
+$ curl -X DELETE http://127.0.0.1:8000/api/tenants/79 -H 'Content-Type: application/json' -H 'Accept: application/json' -H 'Authorization: Bearer <token>'
+HTTP 200
+{"message":"Tenant Evidence Probe deleted successfully."}
+=> 200, as expected
+
+--------------------------------------------------------------
+ADMIN DELETE /api/rooms/28      -> expect 200 now that it is free
+$ curl -X DELETE http://127.0.0.1:8000/api/rooms/28 -H 'Content-Type: application/json' -H 'Accept: application/json' -H 'Authorization: Bearer <token>'
+HTTP 200
+{"message":"Room EVIDENCE-999 deleted successfully."}
+=> 200, as expected
+
+--------------------------------------------------------------
+ADMIN DELETE /api/rooms/29      -> expect 200
+$ curl -X DELETE http://127.0.0.1:8000/api/rooms/29 -H 'Content-Type: application/json' -H 'Accept: application/json' -H 'Authorization: Bearer <token>'
+HTTP 200
+{"message":"Room EVIDENCE-777 deleted successfully."}
+=> 200, as expected
+
+==============================================================
+PART 6 - regression: the boarder app's own routes still work
+==============================================================
+Guarding these with a role would blank five phone screens, so they keep
+auth:sanctum only. A boarder must still get 200 from every one of them.
+
+--------------------------------------------------------------
+GET /api/me with a TENANT token -> expect 200
+$ curl -X GET http://127.0.0.1:8000/api/me -H 'Content-Type: application/json' -H 'Accept: application/json' -H 'Authorization: Bearer <token>'
+HTTP 200
+{"id":78,"user_id":74,"name":"Evidence Tenant","email":"evidence.tenant@example.com","phone":null,"room_id":null,"created_at":"2026-11-12T18:24:57.000000Z","updated_at":"2026-11-12T18:24:57.000000Z","room":null,"payments":[],"check_ins":[]}
+=> 200, as expected
+
+--------------------------------------------------------------
+GET /api/rooms with a TENANT token -> expect 200
+$ curl -X GET http://127.0.0.1:8000/api/rooms -H 'Content-Type: application/json' -H 'Accept: application/json' -H 'Authorization: Bearer <token>'
+HTTP 200
+[{"id":10,"room_number":"101","room_type":"single","price":"2000.00","capacity":1,"status":"occupied","occupancy":1,"available_slots":0,"is_full":true},{"id":11,"room_number":"102","room_type":"double","price":"1500.00","capacity":4,"status":"available","occupancy":0,"available_slots":4,"is_full":false},{"id":12,"room_number":"103","room_type":"single","price":"3000.00","capacity":1,"status":"available","occupancy":0,"available_slots":1,"is_full":false}]
+=> 200, as expected
+
+--------------------------------------------------------------
+GET /api/payments with a TENANT token -> expect 200
+$ curl -X GET http://127.0.0.1:8000/api/payments -H 'Content-Type: application/json' -H 'Accept: application/json' -H 'Authorization: Bearer <token>'
+HTTP 200
+[]
+=> 200, as expected
+
+--------------------------------------------------------------
+GET /api/announcements with a TENANT token -> expect 200
+$ curl -X GET http://127.0.0.1:8000/api/announcements -H 'Content-Type: application/json' -H 'Accept: application/json' -H 'Authorization: Bearer <token>'
+HTTP 200
+[{"id":10,"title":"Water Interruption","content":"MGA BATA PANALOD KAMO DAAN PARA UMAABOT UGMA KY BASIN WAYAY AGAS ,MAONG PAG READY KAMO","published_at":"2026-10-19 13:40","created_at":"2026-10-19T13:41:09.000000Z","updated_at":"2026-10-19T13:41:09.000000Z"}]
+=> 200, as expected
+
+--------------------------------------------------------------
+GET /api/house-rules with a TENANT token -> expect 200
+$ curl -X GET http://127.0.0.1:8000/api/house-rules -H 'Content-Type: application/json' -H 'Accept: application/json' -H 'Authorization: Bearer <token>'
+HTTP 200
+[{"id":12,"title":"Cleanliness","description":"Clean As You Go","is_active":true,"created_at":"2026-10-19T13:34:09.000000Z","updated_at":"2026-10-19T13:34:09.000000Z"},{"id":10,"title":"Curfew Hours","description":"10:00 PM","is_active":true,"created_at":"2026-10-19T13:29:31.000000Z","updated_at":"2026-10-19T13:29:31.000000Z"},{"id":13,"title":"Fire safety","description":"appliances must be turned off when leaving the room","is_active":true,"created_at":"2026-10-19T13:35:48.000000Z","updated_at":"2026-10-19T13:38:08.000000Z"},{"id":9,"title":"Quiet Hours","description":"10:00 PM to 6:00 AM","is_active":true,"created_at":"2026-10-19T13:28:11.000000Z","updated_at":"2026-10-19T13:39:32.000000Z"},{"id":11,"title":"Visiting hours","description":"8:00 AM to 6:00 PM","is_active":true,"created_at":"2026-10-19T13:32:38.000000Z","updated_at":"2026-10-20T04:40:28.000000Z"}]
+=> 200, as expected
+
+--------------------------------------------------------------
+GET /api/tenants with a TENANT token -> expect 200
+$ curl -X GET http://127.0.0.1:8000/api/tenants -H 'Content-Type: application/json' -H 'Accept: application/json' -H 'Authorization: Bearer <token>'
+HTTP 200
+[{"id":49,"user_id":39,"name":"ALFRED CORDERO","email":"alfredcordero@gmail.com","phone":"09555111666","room_id":10,"created_at":"2026-11-11T15:02:12.000000Z","updated_at":"2026-11-11T15:05:55.000000Z","room":{"id":10,"room_number":"101","room_type":"single","price":"2000.00","capacity":1,"status":"occupied","created_at":"2026-10-16T07:21:37.000000Z","updated_at":"2026-11-11T15:02:38.000000Z"}},{"id":78,"user_id":74,"name":"Evidence Tenant","email":"evidence.tenant@example.com","phone":null,"room_id":null,"created_at":"2026-11-12T18:24:57.000000Z","updated_at":"2026-11-12T18:24:57.000000Z","room":null},{"id":56,"user_id":42,"name":"jave gahiloma","email":"javegahiloma@gmail.com","phone":null,"room_id":null,"created_at":"2026-11-12T15:18:24.000000Z","updated_at":"2026-11-12T15:18:24.000000Z","room":null},{"id":55,"user_id":47,"name":"PRINCESS PERUDA","email":"princessperuda@gmial.com","phone":"09111222333","room_id":null,"created_at":"2026-11-12T15:17:31.000000Z","updated_at":"2026-11-12T15:17:31.000000Z","room":null}]
+=> 200, as expected
+
+==============================================================
+PART 7 - the same six routes for an anonymous caller
+==============================================================
+Reads are protected too: a boarder app that works is not an open API.
+
+--------------------------------------------------------------
+GET /api/me with no token -> expect 401
+$ curl -X GET http://127.0.0.1:8000/api/me -H 'Content-Type: application/json' -H 'Accept: application/json'
+HTTP 401
+{"message":"Unauthenticated."}
+=> 401, as expected
+
+--------------------------------------------------------------
+GET /api/rooms with no token -> expect 401
+$ curl -X GET http://127.0.0.1:8000/api/rooms -H 'Content-Type: application/json' -H 'Accept: application/json'
+HTTP 401
+{"message":"Unauthenticated."}
+=> 401, as expected
+
+--------------------------------------------------------------
+GET /api/payments with no token -> expect 401
+$ curl -X GET http://127.0.0.1:8000/api/payments -H 'Content-Type: application/json' -H 'Accept: application/json'
+HTTP 401
+{"message":"Unauthenticated."}
+=> 401, as expected
+
+--------------------------------------------------------------
+GET /api/announcements with no token -> expect 401
+$ curl -X GET http://127.0.0.1:8000/api/announcements -H 'Content-Type: application/json' -H 'Accept: application/json'
+HTTP 401
+{"message":"Unauthenticated."}
+=> 401, as expected
+
+--------------------------------------------------------------
+GET /api/house-rules with no token -> expect 401
+$ curl -X GET http://127.0.0.1:8000/api/house-rules -H 'Content-Type: application/json' -H 'Accept: application/json'
+HTTP 401
+{"message":"Unauthenticated."}
+=> 401, as expected
+
+--------------------------------------------------------------
+GET /api/tenants with no token -> expect 401
+$ curl -X GET http://127.0.0.1:8000/api/tenants -H 'Content-Type: application/json' -H 'Accept: application/json'
+HTTP 401
+{"message":"Unauthenticated."}
+=> 401, as expected
+
+==============================================================
+SCORE
+==============================================================
+37 checks run, 37 matched, 0 did not.
+
+--------------------------------------------------------------
+CLEANUP - the two throwaway accounts, their tokens and the three probe
+rows were deleted. No real account was touched.
+Remaining accounts:
+24	admin@gmail.com	admin
+39	alfredcordero@gmail.com	tenant
+42	javegahiloma@gmail.com	tenant
+47	princessperuda@gmial.com	tenant
++-------+---------+----------+--------+
+| rooms | tenants | payments | tokens |
++-------+---------+----------+--------+
+|     3 |       3 |        2 |     14 |
++-------+---------+----------+--------+
+RESULT : all 37 checks matched their expected status.
