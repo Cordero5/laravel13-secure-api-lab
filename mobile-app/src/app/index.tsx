@@ -1,7 +1,6 @@
 import { Redirect } from 'expo-router';
 
-// The login screen lives at /login, mirroring /register. This root route only
-// exists so an old bookmark or a bare localhost URL still lands there.
+// Keep the tenant entry URL distinct from the backend's /admin/login URL.
 export default function Index() {
-  return <Redirect href="/login" />;
+  return <Redirect href="/tenant/login" />;
 }

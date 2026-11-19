@@ -65,9 +65,7 @@ class Kernel extends HttpKernel
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
 
-        // Role-based authorization. Laravel 10 reads aliases from this
-        // property, not from bootstrap/app.php as later versions do.
+        // Laravel 10 registers route middleware aliases here.
         'role' => \App\Http\Middleware\CheckRole::class,
-        'admin' => \App\Http\Middleware\AdminMiddleware::class,
     ];
 }

@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import API from '../services/api';
-import { C, S, money, titleCase } from '../theme';
-import { Avatar, Card, EmptyState, Loader, Pill, Screen, SectionLabel } from '../components/bh';
+import API from '../../services/api';
+import { C, S, money, titleCase } from '../../theme';
+import { Avatar, Card, EmptyState, Loader, Pill, Screen, SectionLabel } from '../../components/bh';
 
 type Room = {
   id: number;
@@ -44,20 +44,26 @@ export default function ProfileScreen() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchProfile();
-  }, []);
+    let active = true;
 
-  const fetchProfile = async () => {
-    try {
-      const response = await API.get('/me');
-      setTenant(response.data as Profile);
-    } catch (fetchError) {
-      setError('Could not load your tenant profile.');
-      console.error('Failed to fetch profile:', fetchError);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const fetchProfile = async () => {
+      try {
+        const response = await API.get('/me');
+        if (active) setTenant(response.data as Profile);
+      } catch (fetchError) {
+        if (active) setError('Could not load your tenant profile.');
+        console.error('Failed to fetch profile:', fetchError);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    void fetchProfile();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const day = (value: string | null | undefined) => (value ? String(value).slice(0, 10) : 'no date');
 

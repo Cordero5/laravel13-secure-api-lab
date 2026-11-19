@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { router, type Href } from 'expo-router';
-import API, { clearToken, setUnauthorizedHandler } from '../services/api';
-import { C, S, TONES, money, titleCase, type Tone } from '../theme';
-import { Card, EmptyState, Meter, Screen, SectionLabel } from '../components/bh';
+import API, { clearToken, setUnauthorizedHandler } from '../../services/api';
+import { C, S, TONES, money, titleCase, type Tone } from '../../theme';
+import { Card, EmptyState, Meter, Screen, SectionLabel } from '../../components/bh';
 
 type Room = {
   id: number;
@@ -24,12 +24,13 @@ type Me = {
 };
 
 const SECTIONS: { route: Href; title: string; desc: string; mark: string; tone: Tone }[] = [
-  { route: '/rooms', title: 'Rooms', desc: 'Availability, price and capacity', mark: 'R', tone: 'brand' },
-  { route: '/tenants', title: 'Tenants', desc: 'Who lives in the house', mark: 'T', tone: 'neutral' },
-  { route: '/payments', title: 'Payments', desc: 'Rent records and payment status', mark: '₱', tone: 'ok' },
-  { route: '/house-rules', title: 'House Rules', desc: 'Rules you follow while staying here', mark: '§', tone: 'warn' },
-  { route: '/announcements', title: 'Announcements', desc: 'Notices posted by the admin', mark: 'A', tone: 'brand' },
-  { route: '/profile', title: 'My Profile', desc: 'Your room, payments and check-ins', mark: 'P', tone: 'neutral' },
+  { route: '/tenant/rooms', title: 'Rooms', desc: 'Availability, price and capacity', mark: 'R', tone: 'brand' },
+  { route: '/tenant/tenants', title: 'Tenants', desc: 'Who lives in the house', mark: 'T', tone: 'neutral' },
+  { route: '/tenant/payments', title: 'Payments', desc: 'Rent records and payment status', mark: '₱', tone: 'ok' },
+  { route: '/tenant/check-ins', title: 'Check-ins', desc: 'Your arrival and departure history', mark: 'C', tone: 'brand' },
+  { route: '/tenant/house-rules', title: 'House Rules', desc: 'Rules you follow while staying here', mark: '§', tone: 'warn' },
+  { route: '/tenant/announcements', title: 'Announcements', desc: 'Notices posted by the admin', mark: 'A', tone: 'brand' },
+  { route: '/tenant/profile', title: 'My Profile', desc: 'Your room, payments and check-ins', mark: 'P', tone: 'neutral' },
 ];
 
 export default function DashboardScreen() {
@@ -39,7 +40,7 @@ export default function DashboardScreen() {
   useEffect(() => {
     // If any protected call comes back 401, the session is gone - send the
     // user back to the login screen instead of showing empty lists.
-    setUnauthorizedHandler(() => router.replace('/login'));
+    setUnauthorizedHandler(() => router.replace('/tenant/login'));
     return () => setUnauthorizedHandler(null);
   }, []);
 
@@ -60,7 +61,7 @@ export default function DashboardScreen() {
       console.warn('Logout request failed, clearing the local token anyway:', error);
     } finally {
       clearToken();
-      router.replace('/login');
+      router.replace('/tenant/login');
     }
   };
 

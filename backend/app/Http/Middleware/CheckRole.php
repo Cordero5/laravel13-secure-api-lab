@@ -7,10 +7,9 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Authorization middleware: after Sanctum has proven *who* the caller is,
- * this decides *what* that caller is allowed to reach.
+ * Authorize the current user against the roles listed on a route.
  *
- * Usage: Route::middleware(['auth:sanctum', 'role:admin,tenant'])
+ * Usage: Route::middleware(['auth', 'role:admin,tenant'])
  */
 class CheckRole
 {
@@ -18,17 +17,25 @@ class CheckRole
     {
         $user = $request->user();
 
-        // Defensive: auth:sanctum already stops anonymous callers, but the
-        // middleware must not assume it was paired with it.
         if (!$user) {
-            return response()->json(['message' => 'Unauthenticated.'], 401);
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Unauthenticated.'], 401);
+            }
+
+            abort(401);
         }
 
         if (!in_array($user->role, $roles, true)) {
-            return response()->json([
-                'message' => 'Forbidden. This endpoint requires one of these roles: ' . implode(', ', $roles) . '.',
-                'your_role' => $user->role,
-            ], 403);
+            $message = 'Forbidden. This endpoint requires one of these roles: ' . implode(', ', $roles) . '.';
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => $message,
+                    'your_role' => $user->role,
+                ], 403);
+            }
+
+            abort(403, $message);
         }
 
         return $next($request);

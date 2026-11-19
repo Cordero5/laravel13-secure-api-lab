@@ -13,8 +13,9 @@ use Illuminate\Http\Request;
  * returns a short identifying message plus a small slice of real data, so a
  * Postman screenshot shows both the HTTP status and who was allowed in.
  *
- * The Expo app never calls these routes, which is why they can be guarded
- * without risking any screen on the phone.
+ * The tenant app does not use these demonstration routes for its normal
+ * screens. Its /admin/dashboard deep link calls the admin overview to verify
+ * the same server-side role guard before showing an access result.
  */
 class AuthorizationController extends Controller
 {

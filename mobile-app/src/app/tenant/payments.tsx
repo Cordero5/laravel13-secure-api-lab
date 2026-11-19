@@ -1,28 +1,34 @@
 import React, { useEffect, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import API from '../services/api';
-import { C, S, money, titleCase } from '../theme';
-import { Card, EmptyState, Loader, Pill, Screen } from '../components/bh';
+import API from '../../services/api';
+import { C, S, money, titleCase } from '../../theme';
+import { Card, EmptyState, Loader, Pill, Screen } from '../../components/bh';
 
 export default function PaymentsScreen() {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchPayments();
-  }, []);
+    let active = true;
 
-  const fetchPayments = async () => {
-    try {
-      const response = await API.get('/payments');
-      setPayments(response.data);
-    } catch (error) {
-      console.error('Failed to fetch payments:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const fetchPayments = async () => {
+      try {
+        const response = await API.get('/payments');
+        if (active) setPayments(response.data);
+      } catch (error) {
+        console.error('Failed to fetch payments:', error);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    void fetchPayments();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const paidTotal = payments
     .filter((payment: Record<string, any>) => payment.status === 'paid')

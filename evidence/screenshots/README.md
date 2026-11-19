@@ -1,23 +1,23 @@
 # Browser captures
 
-Six images, taken from the running system. Four of them form a two-by-two grid — the two surfaces the project has, and on each one an account whose role fits and an account whose role does not. The fifth covers a restricted action, the sixth an unauthenticated caller.
+The images currently checked in here predate the Laravel tenant session portal and the server-side web role checks. They are supplemental historical captures, not proof of the new direct-URL authorization behavior. In particular, replace `03-admin-role-denied.png` before submitting the updated lab: sign in at `/tenant/login`, navigate directly to `/admin/dashboard`, and capture the resulting HTTP 403 with the URL visible.
 
 | File | Address in the picture | Signed in as | What the screen proves |
 |---|---|---|---|
 | `01-admin-allowed.png` | `127.0.0.1:8000/admin/dashboard` | `admin@gmail.com`, role `admin` | The staff dashboard renders with house statistics, and the header chip reads **Admin**. Allowed on the staff surface. |
 | `02-tenants-allowed.png` | `localhost:8082/dashboard` | `princessperuda@gmial.com`, role `tenant` | The boarder app renders the signed-in dashboard with all six section cards. Allowed on the boarder surface. |
-| `03-admin-role-denied.png` | `127.0.0.1:8000/admin/login` | `princessperuda@gmial.com`, role `tenant` | Red banner, *Those credentials do not match an admin account.* The password was correct; the role was not. Denied on the staff surface. |
+| `03-admin-role-denied.png` (legacy) | `127.0.0.1:8000/admin/login` | `princessperuda@gmial.com`, role `tenant` | The admin sign-in form refuses the tenant account. This is not a direct protected-route denial; replace it with a logged-in tenant receiving 403 at `/admin/dashboard`. |
 | `04-tenants-role-denied.png` | `localhost:8082/login` | `admin@gmail.com`, role `admin` | The **Access Denied** dialog: *That account's role is "admin", which is a staff role, so it is denied here.* Denied on the boarder surface. |
 | `05-restricted-action-denied.png` | `127.0.0.1:8000/admin/rooms` | `admin@gmail.com`, role `admin` | *Please fix the following: That room number already exists.* A create the server refused — and room 101, 102 and 103 are all still listed underneath, so nothing changed. |
 | `06-guest-blocked.png` | `127.0.0.1:8000/admin/login` | nobody | The login card, reached after requesting `/admin/dashboard` with no session. The protected page never rendered. |
 
-Read as a grid, 01 and 02 are the two allowed cases, 03 and 04 are the same two surfaces refusing the wrong role, and 05 and 06 are the action-level and authentication-level refusals.
+The existing images document the earlier admin/mobile app sign-in flows. They do not replace the required authenticated tenant route-denial capture for the current RBAC implementation.
 
 ## Where each rule actually lives
 
 The screenshots show the interface refusing; the server-side reason is a different piece of code in each case, and it is worth keeping them straight:
 
-- 03 is `Admin\AuthController`, which puts `role => 'admin'` inside the `Auth::attempt` credentials, so a boarder's correct password simply finds no matching admin row.
+- The legacy 03 image is `Admin\AuthController`, which puts `role => 'admin'` inside the `Auth::attempt` credentials. The updated route-level denial is `CheckRole` applied to `/admin/*` in `routes/web.php`.
 - 04 is the login screen in `mobile-app/src/app/login.tsx`, which inspects the `role` returned by `POST /api/login` and clears the token again. This one is deliberately client-side.
 - 05 is Laravel's `Rule::unique('rooms', 'room_number')` in `Admin\RoomController`.
 - 06 is the `auth` middleware alias on the `/admin/*` route group, answering with a 302.

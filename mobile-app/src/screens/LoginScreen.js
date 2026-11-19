@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View, Alert, ActivityIndicator } from 'react-native';
-import API from '../services/api';
+import API, { setToken } from '../services/api';
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
@@ -21,10 +21,12 @@ export default function LoginScreen({ navigation }) {
       });
 
       const { access_token, user } = response.data;
+      setToken(access_token);
       Alert.alert('Success', `Welcome back, ${user.name}!`);
-      
-      // TODO: Store token securely and navigate to Dashboard
-      // navigation.replace('Dashboard');
+
+      if (navigation && typeof navigation.replace === 'function') {
+        navigation.replace('Dashboard');
+      }
     } catch (error) {
       const message = error.response?.data?.message || 'Invalid credentials or connection error.';
       Alert.alert('Login Failed', message);

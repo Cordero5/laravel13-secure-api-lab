@@ -7,7 +7,7 @@ Supporting material for the RBAC laboratory submission. Everything here is gener
 | `capture-rbac-matrix.sh` | Exercises every guarded endpoint as anonymous, tenant and admin, scores each response against the status the route should return, then cleans up after itself |
 | `rbac-matrix.txt` | The raw transcript it produced — the request, the HTTP status, the response body and the verdict for each call |
 | `capture-browser-matrix.cjs` | Drives a headless Chrome through the seven sign-in, create and delete flows and screenshots them |
-| `screenshots/` | The six browser captures the lab asks for, plus the guide for adding Postman ones |
+| `screenshots/` | Existing browser captures and guidance; the tenant-denial image predates the new web route guard |
 
 ## Regenerating the transcript
 
@@ -53,10 +53,10 @@ Parts 1 to 3 — which role may reach which endpoint:
 |---|---|---|---|---|
 | anonymous | `GET /api/admin/overview` | `auth:sanctum` | 401 | 401 |
 | anonymous | `POST /api/rooms` | `auth:sanctum` | 401 | 401 |
-| tenant | `GET /api/admin/overview` | `admin` | 403 | 403 |
+| tenant | `GET /api/admin/overview` | `role:admin` | 403 | 403 |
 | tenant | `GET /api/tenant/summary` | `role:tenant` | 200 | 200 |
 | tenant | `GET /api/house/rooms` | `role:admin,tenant` | 200 | 200 |
-| admin | `GET /api/admin/overview` | `admin` | 200 | 200 |
+| admin | `GET /api/admin/overview` | `role:admin` | 200 | 200 |
 | admin | `GET /api/tenant/summary` | `role:tenant` | 403 | 403 |
 | admin | `GET /api/house/rooms` | `role:admin,tenant` | 200 | 200 |
 
@@ -80,9 +80,19 @@ Part 6 — the regression check: `/api/me`, `/api/rooms`, `/api/payments`, `/api
 
 Part 7 — the same six routes with no token at all, each returning 401. A boarder app that works is not an open API.
 
+The web portal routes use the same dynamic `role` middleware as the API. The Expo `/admin/dashboard` route also calls `GET /api/admin/overview`, so its denial comes from the same server-side role guard. Run the focused route tests with `cd backend && php artisan test --filter=RoleAccessTest`; these verify guest redirects, tenant denial on admin pages/actions and APIs, tenant session persistence, and both roles' access to the shared rooms page.
+
 ## Browser captures
 
-`screenshots/` holds the graded images. Four form a two-by-two grid of surface and role; the other two cover a refused action and an unauthenticated caller:
+`screenshots/` contains the existing images. These were captured before the Laravel tenant session portal and the server-side web role checks were added. In particular, `03-admin-role-denied.png` shows a tenant refused by the admin login form; it is not evidence that an already-authenticated tenant gets HTTP 403 by directly opening `/admin/dashboard`. For the updated lab, replace it with a browser capture showing a tenant session denied on that protected URL:
+
+1. Sign in at `http://localhost:8081/tenant/login`.
+2. Directly navigate to `http://localhost:8081/admin/dashboard`.
+3. Capture the resulting 403 page with the URL visible. Guests instead receive 401 and the tenant-login prompt.
+
+The equivalent Laravel session test uses port 8000: sign in at `/tenant/login`, then open `/admin/dashboard` on the same origin. Do not mix the Expo URL on port 8081 with the Laravel web routes on port 8000; their sessions are separate.
+
+The remaining images show the previous API/mobile app flows and can be retained as supplemental evidence.
 
 | File | Shows |
 |---|---|

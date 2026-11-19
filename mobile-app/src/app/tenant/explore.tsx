@@ -41,7 +41,7 @@ export default function TabTwoScreen() {
         <ThemedView style={styles.titleContainer}>
           <ThemedText type="subtitle">Explore</ThemedText>
           <ThemedText style={styles.centerText} themeColor="textSecondary">
-            This starter app includes example{'\n'}code to help you get started.
+            Tenant app resources and example content.
           </ThemedText>
 
           <ExternalLink href="https://docs.expo.dev" asChild>
@@ -61,12 +61,11 @@ export default function TabTwoScreen() {
         <ThemedView style={styles.sectionsWrapper}>
           <Collapsible title="File-based routing">
             <ThemedText type="small">
-              This app has two screens: <ThemedText type="code">src/app/index.tsx</ThemedText> and{' '}
-              <ThemedText type="code">src/app/explore.tsx</ThemedText>
+              Tenant routes live under <ThemedText type="code">src/app/tenant/</ThemedText>.
             </ThemedText>
             <ThemedText type="small">
-              The layout file in <ThemedText type="code">src/app/_layout.tsx</ThemedText> sets up
-              the tab navigator.
+              The root layout in <ThemedText type="code">src/app/_layout.tsx</ThemedText> sets up
+              the app navigation.
             </ThemedText>
             <ExternalLink href="https://docs.expo.dev/router/introduction">
               <ThemedText type="linkPrimary">Learn more</ThemedText>

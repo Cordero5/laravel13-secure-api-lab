@@ -97,14 +97,13 @@ class TenantController extends Controller
     }
 
     /**
-     * Admin only: remove a tenant record. The users row survives, and the
-     * foreign keys on payments and check-ins are ON DELETE SET NULL, so the
-     * history is kept with the owner column blanked rather than destroyed.
+     * Admin only: remove the tenant and linked tenant account. The foreign
+     * keys on payments and check-ins are ON DELETE SET NULL, preserving history.
      */
     public function destroy(Tenant $tenant)
     {
         $name = $tenant->name;
-        $tenant->delete();
+        $tenant->deleteWithAccount();
 
         return response()->json([
             'message' => "Tenant {$name} deleted successfully.",

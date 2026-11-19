@@ -8,20 +8,36 @@ use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\CheckInController;
 use App\Http\Controllers\Admin\HouseRuleController;
 use App\Http\Controllers\Admin\AnnouncementController;
-use App\Http\Controllers\Admin\AuthController;
+use App\Http\Controllers\Admin\AuthController as AdminAuthController;
+use App\Http\Controllers\HouseController;
+use App\Http\Controllers\Tenant\AuthController as TenantAuthController;
 
 Route::get('/', function () {
     return view('welcome');
 });
 
 // Sign-in screen. Only reachable while signed out.
-Route::get('/admin/login', [AuthController::class, 'showLoginForm'])->name('admin.login');
-Route::post('/admin/login', [AuthController::class, 'login'])->name('admin.login.submit');
+Route::get('/admin/login', [AdminAuthController::class, 'showLoginForm'])->name('admin.login');
+Route::post('/admin/login', [AdminAuthController::class, 'login'])->name('admin.login.submit');
 
-// Everything below requires a signed-in admin. Authenticate sends guests to
-// the login page above, and AuthController only accepts role = admin.
-Route::middleware('auth')->group(function () {
-    Route::post('/admin/logout', [AuthController::class, 'logout'])->name('admin.logout');
+Route::get('/tenant/login', [TenantAuthController::class, 'showLoginForm'])->name('tenant.login');
+Route::post('/tenant/login', [TenantAuthController::class, 'login'])->name('tenant.login.submit');
+
+Route::middleware(['auth', 'role:admin,tenant'])
+    ->get('/house/rooms', [HouseController::class, 'rooms'])
+    ->name('house.rooms');
+
+Route::middleware(['auth', 'role:tenant'])
+    ->prefix('tenant')
+    ->name('tenant.')
+    ->group(function () {
+        Route::get('/dashboard', [TenantAuthController::class, 'dashboard'])->name('dashboard');
+        Route::post('/logout', [TenantAuthController::class, 'logout'])->name('logout');
+    });
+
+// Every panel page and action is restricted on the server, not just at login.
+Route::middleware(['auth', 'role:admin'])->group(function () {
+    Route::post('/admin/logout', [AdminAuthController::class, 'logout'])->name('admin.logout');
 
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');

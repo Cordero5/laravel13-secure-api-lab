@@ -1,28 +1,34 @@
 import React, { useEffect, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import API from '../services/api';
-import { C, S, money } from '../theme';
-import { BedDots, Card, EmptyState, Loader, Pill, Screen } from '../components/bh';
+import API from '../../services/api';
+import { C, S, money } from '../../theme';
+import { BedDots, Card, EmptyState, Loader, Pill, Screen } from '../../components/bh';
 
 export default function RoomsScreen() {
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchRooms();
-  }, []);
+    let active = true;
 
-  const fetchRooms = async () => {
-    try {
-      const response = await API.get('/rooms');
-      setRooms(response.data);
-    } catch (error) {
-      console.error('Failed to fetch rooms:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const fetchRooms = async () => {
+      try {
+        const response = await API.get('/rooms');
+        if (active) setRooms(response.data);
+      } catch (error) {
+        console.error('Failed to fetch rooms:', error);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    void fetchRooms();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const open = rooms.filter((room: Record<string, any>) => room.status === 'available').length;
 

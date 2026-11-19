@@ -2,22 +2,21 @@
 /*
  * Dev-only LAN bridge for the mobile app.
  *
- * Windows Firewall blocks inbound traffic to php.exe, so a phone cannot reach
- * `php artisan serve` directly. Node.js already has an allow rule on every
- * profile and port, so this proxy listens on the public port and forwards to
- * Laravel on loopback.
+ * A phone cannot reach a Laravel server bound only to loopback. This proxy
+ * listens on the LAN interface and forwards requests to Laravel on loopback.
+ * Windows Firewall must allow Node.js to accept private-network connections.
  *
- *   node scripts/lan-api-proxy.cjs            # 0.0.0.0:8000 -> 127.0.0.1:8001
- *   node scripts/lan-api-proxy.cjs 8000 8001  # explicit listen / target ports
+ *   node scripts/lan-api-proxy.cjs            # 0.0.0.0:8080 -> 127.0.0.1:8000
+ *   node scripts/lan-api-proxy.cjs 8080 8000  # explicit listen / target ports
  *
  * Run Laravel on the target port:
- *   php artisan serve --host=127.0.0.1 --port=8001
+ *   php artisan serve --host=127.0.0.1 --port=8000
  */
 const http = require('http');
 const net = require('net');
 
-const LISTEN_PORT = Number(process.argv[2]) || 8000;
-const TARGET_PORT = Number(process.argv[3]) || 8001;
+const LISTEN_PORT = Number(process.argv[2]) || 8080;
+const TARGET_PORT = Number(process.argv[3]) || 8000;
 const TARGET_HOST = '127.0.0.1';
 
 const server = http.createServer((req, res) => {

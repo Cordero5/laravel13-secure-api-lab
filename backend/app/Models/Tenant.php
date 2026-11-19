@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 
 class Tenant extends Model
 {
@@ -44,6 +45,25 @@ class Tenant extends Model
     public function checkIns(): HasMany
     {
         return $this->hasMany(CheckIn::class);
+    }
+
+    /**
+     * Delete the tenant and its linked tenant login account, if any.
+     */
+    public function deleteWithAccount(): void
+    {
+        DB::transaction(function () {
+            $user = $this->user;
+
+            if (!$this->delete()) {
+                return;
+            }
+
+            if ($user?->role === 'tenant') {
+                $user->tokens()->delete();
+                $user->delete();
+            }
+        });
     }
 
     /**

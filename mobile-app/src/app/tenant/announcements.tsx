@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import API from '../services/api';
-import { C, S } from '../theme';
-import { Card, EmptyState, Loader, Screen } from '../components/bh';
+import API from '../../services/api';
+import { C, S } from '../../theme';
+import { Card, EmptyState, Loader, Screen } from '../../components/bh';
 
 type Announcement = {
   id: number;
@@ -18,20 +18,26 @@ export default function AnnouncementsScreen() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchAnnouncements();
-  }, []);
+    let active = true;
 
-  const fetchAnnouncements = async () => {
-    try {
-      const response = await API.get('/announcements');
-      setAnnouncements(response.data);
-    } catch (fetchError) {
-      setError('Could not reach the server. Check that you are signed in.');
-      console.error('Failed to fetch announcements:', fetchError);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const fetchAnnouncements = async () => {
+      try {
+        const response = await API.get('/announcements');
+        if (active) setAnnouncements(response.data);
+      } catch (fetchError) {
+        if (active) setError('Could not reach the server. Check that you are signed in.');
+        console.error('Failed to fetch announcements:', fetchError);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    void fetchAnnouncements();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const formatDate = (value: string | null) => {
     if (!value) return '';

@@ -93,8 +93,7 @@ class AuthController extends Controller
             $user->forceFill(['fcm_token' => $data['fcm_token']])->save();
         }
 
-        // An admin can delete the tenant record while leaving the login in
-        // place, which would leave the app with no profile to show.
+        // Repair tenant accounts created before their matching profile existed.
         if ($user->role === 'tenant' && !$user->tenant) {
             $user->tenant()->create([
                 'name'  => $user->name,

@@ -1,28 +1,34 @@
 import React, { useEffect, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import API from '../services/api';
-import { C, S } from '../theme';
-import { Avatar, Card, EmptyState, Loader, Pill, Screen } from '../components/bh';
+import API from '../../services/api';
+import { C, S } from '../../theme';
+import { Avatar, Card, EmptyState, Loader, Pill, Screen } from '../../components/bh';
 
 export default function TenantsScreen() {
   const [tenants, setTenants] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchTenants();
-  }, []);
+    let active = true;
 
-  const fetchTenants = async () => {
-    try {
-      const response = await API.get('/tenants');
-      setTenants(response.data);
-    } catch (error) {
-      console.error('Failed to fetch tenants:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const fetchTenants = async () => {
+      try {
+        const response = await API.get('/tenants');
+        if (active) setTenants(response.data);
+      } catch (error) {
+        console.error('Failed to fetch tenants:', error);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    void fetchTenants();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const housed = tenants.filter((tenant: Record<string, any>) => tenant.room).length;
 

@@ -12,9 +12,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import API, { setToken, clearToken } from '../services/api';
-import { notify } from '../services/alert';
-import { C, S } from '../theme';
+import API, { setToken, clearToken } from '../../services/api';
+import { notify } from '../../services/alert';
+import { C, S } from '../../theme';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -54,13 +54,13 @@ export default function LoginScreen() {
       setToken(access_token);
 
       // Navigate to Dashboard on successful login
-      router.replace('/dashboard');
+      router.replace('/tenant/dashboard');
     } catch (error: any) {
       clearToken();
       // No response at all means the phone never reached the server, which is
       // a different fix than a wrong password.
       const message = error?.response?.data?.message
-        || 'Cannot reach the server. Check that the phone is on the same Wi-Fi and that php artisan serve is running.';
+        || `Cannot reach ${API.defaults.baseURL}. Check that the phone and computer are on the same Wi-Fi, and that the LAN API proxy is running.`;
       notify('Login Failed', message);
     } finally {
       setLoading(false);
@@ -85,7 +85,7 @@ export default function LoginScreen() {
             <Text style={S.fieldLabel}>Email Address</Text>
             <TextInput
               style={field('email')}
-              placeholder="you@example.com"
+              placeholder="Email"
               placeholderTextColor="#9aa5b4"
               value={email}
               onChangeText={setEmail}
@@ -120,7 +120,7 @@ export default function LoginScreen() {
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity style={S.link} onPress={() => router.push('/register')} disabled={loading}>
+            <TouchableOpacity style={S.link} onPress={() => router.push('/tenant/register')} disabled={loading}>
               <Text style={S.linkText}>New here? Create an account</Text>
             </TouchableOpacity>
           </View>

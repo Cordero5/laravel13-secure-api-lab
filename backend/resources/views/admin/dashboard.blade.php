@@ -35,7 +35,7 @@
 
     /* Meters */
     .meter { display: flex; height: 8px; border-radius: 999px; background: #eaeef5; overflow: hidden; }
-    .meter > span { display: block; height: 100%; transition: width .4s ease; }
+    .meter > span { display: block; flex: 0 0 auto; height: 100%; transition: width .4s ease; }
     .meter-lg { height: 10px; }
     .meter-paid { background: var(--bh-ok); }
     .meter-due { background: var(--bh-warn); }

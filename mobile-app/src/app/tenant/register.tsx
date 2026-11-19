@@ -12,9 +12,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import API, { setToken } from '../services/api';
-import { notify } from '../services/alert';
-import { C, S } from '../theme';
+import API, { setToken } from '../../services/api';
+import { notify } from '../../services/alert';
+import { C, S } from '../../theme';
 
 export default function RegisterScreen() {
   const [name, setName] = useState('');
@@ -59,7 +59,7 @@ export default function RegisterScreen() {
         : ' Ask the admin to assign your room.';
 
       notify('Account created', `Welcome, ${name}!${linked}`, [
-        { text: 'OK', onPress: () => router.replace('/dashboard') },
+        { text: 'OK', onPress: () => router.replace('/tenant/dashboard') },
       ]);
     } catch (error: any) {
       const errors = error?.response?.data?.errors;
@@ -67,7 +67,7 @@ export default function RegisterScreen() {
       const message =
         (Array.isArray(firstFieldError) ? firstFieldError[0] : firstFieldError) ||
         error?.response?.data?.message ||
-        'Could not reach the server. Check that you are on the same network.';
+        `Could not reach ${API.defaults.baseURL}. Check that the phone and computer are on the same Wi-Fi, and that the LAN API proxy is running.`;
       notify('Registration Failed', String(message));
     } finally {
       setLoading(false);
@@ -90,7 +90,7 @@ export default function RegisterScreen() {
             <Text style={S.fieldLabel}>Full Name</Text>
             <TextInput
               style={field('name')}
-              placeholder="Alfred B Cordero"
+              placeholder="Full Name"
               placeholderTextColor="#9aa5b4"
               value={name}
               onChangeText={setName}
@@ -102,7 +102,7 @@ export default function RegisterScreen() {
             <Text style={S.fieldLabel}>Email Address</Text>
             <TextInput
               style={field('email')}
-              placeholder="you@example.com"
+              placeholder="Email"
               placeholderTextColor="#9aa5b4"
               value={email}
               onChangeText={setEmail}
@@ -161,7 +161,7 @@ export default function RegisterScreen() {
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity style={S.link} onPress={() => router.replace('/login')} disabled={loading}>
+            <TouchableOpacity style={S.link} onPress={() => router.replace('/tenant/login')} disabled={loading}>
               <Text style={S.linkText}>Already have an account? Sign in</Text>
             </TouchableOpacity>
           </View>

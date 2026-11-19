@@ -10,9 +10,13 @@ class AuthController extends Controller
 {
     public function showLoginForm()
     {
-        return Auth::check()
-            ? redirect()->route('admin.dashboard')
-            : view('admin.auth.login');
+        if (!Auth::check()) {
+            return view('admin.auth.login');
+        }
+
+        return Auth::user()->role === 'tenant'
+            ? redirect()->route('tenant.dashboard')
+            : redirect()->route('admin.dashboard');
     }
 
     public function login(Request $request)

@@ -52,15 +52,15 @@ Route::middleware('auth:sanctum')->group(function () {
 | Role-based authorization (RBAC laboratory)
 |--------------------------------------------------------------------------
 |
-| Authentication (auth:sanctum) proves who the caller is; the "admin" and
-| "role" aliases below decide whether that caller may enter. These routes are
+| Authentication (auth:sanctum) proves who the caller is; the dynamic "role"
+| alias below decides whether that caller may enter. These routes are
 | deliberately separate from the group above: the phone authenticates as a
 | tenant, so guarding its read endpoints would blank five screens.
 |
 */
 
 // Admin only — a tenant token gets 403 here.
-Route::middleware(['auth:sanctum', 'admin'])
+Route::middleware(['auth:sanctum', 'role:admin'])
     ->get('/admin/overview', [AuthorizationController::class, 'overview']);
 
 // Tenant only — an admin token gets 403 here.
@@ -78,7 +78,7 @@ Route::middleware(['auth:sanctum', 'role:admin,tenant'])
 |
 | The room, tenant and payment records were previously editable only by signing
 | into the web panel. These routes expose the same create/update/delete actions
-| over JSON, guarded by the "admin" alias, so a tenant bearer token is refused
+| over JSON, guarded by the dynamic role middleware, so a tenant bearer token is refused
 | with 403 before the controller runs and nothing is written.
 |
 | PUT /api/tenants/{id} is intentionally absent: it already lives in the
@@ -86,7 +86,7 @@ Route::middleware(['auth:sanctum', 'role:admin,tenant'])
 | Registering the same path and method twice would shadow that route.
 |
 */
-Route::middleware(['auth:sanctum', 'admin'])->group(function () {
+Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::apiResource('rooms', RoomController::class)->only(['store', 'update', 'destroy']);
     Route::apiResource('tenants', TenantController::class)->only(['store', 'destroy']);
     Route::apiResource('payments', PaymentController::class)->only(['store', 'update', 'destroy']);

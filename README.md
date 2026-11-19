@@ -39,9 +39,47 @@ A boarding house management system built as two applications over one MySQL data
 
 | Part | Location | Runs on |
 |---|---|---|
-| Admin panel + JSON API | `backend/` | `php artisan serve` on `127.0.0.1:8000` |
+| Admin panel, tenant session portal + JSON API | `backend/` | `php artisan serve --host=127.0.0.1 --port=8000` |
 | Boarder mobile app | `mobile-app/` | Expo Go, or `npx expo start --web` |
-| LAN API proxy | `backend/scripts/lan-api-proxy.cjs` | `0.0.0.0:8080` forwarding to port 8000 |
+| LAN API proxy | `backend/scripts/lan-api-proxy.cjs` | `0.0.0.0:8080` forwarding to Laravel on port 8000 |
+
+### Run the mobile app on a phone
+
+The phone cannot reach Laravel through `127.0.0.1`, and Windows may block
+inbound traffic to `php.exe`. Run Laravel locally and expose it through the
+Node.js LAN proxy. Keep these commands running in separate terminals:
+
+```powershell
+# Terminal 1
+cd backend
+php artisan serve --host=127.0.0.1 --port=8000
+
+# Terminal 2
+cd backend
+node scripts/lan-api-proxy.cjs
+
+# Terminal 3
+cd mobile-app
+npx expo start
+```
+
+The mobile app derives the computer's LAN IP from the Expo development server
+and sends native API requests to port `8080`, where the proxy listens. The
+computer and phone must be on the same Wi-Fi. If Windows Firewall prompts,
+allow Node.js on the private network. For a standalone build or a network where
+Expo cannot provide the computer's address, set `EXPO_PUBLIC_API_HOST` to the
+computer's LAN IP before starting Expo. You can override the proxy port with
+`EXPO_PUBLIC_API_PORT`; it defaults to `8080`.
+
+The web build continues to call Laravel directly at `127.0.0.1:8000`.
+
+The Expo tenant app uses a clearly namespaced URL such as
+`http://localhost:8081/tenant/login` or
+`http://localhost:8081/tenant/dashboard` (the Expo port can change). The Laravel
+session portal is a separate site on port 8000, at
+`http://127.0.0.1:8000/tenant/login` and
+`http://127.0.0.1:8000/tenant/dashboard`. The admin panel is at
+`http://127.0.0.1:8000/admin/login`.
 
 ## Roles and permissions
 
@@ -52,26 +90,23 @@ Two roles exist, stored in the `role` column of the `users` table: `admin` for t
 | Sign in to the admin panel (`/admin/login`) | Allowed | Denied |
 | Admin dashboard with house statistics | Allowed | Denied |
 | Manage records on the panel — create, edit, delete rooms, tenants, payments, check-ins, rules, announcements | Allowed | Denied |
+| Tenant session portal (`/tenant/login`, `/tenant/dashboard`) | Denied | Allowed |
+| Shared house rooms page (`/house/rooms`) | Allowed | Allowed |
 | `GET /api/admin/overview` | Allowed | Denied (403) |
 | `GET /api/house/rooms` — shared house list | Allowed | Allowed |
 | `GET /api/tenant/summary` — own boarder record | Denied (403) | Allowed |
 | `GET /api/me`, `/api/rooms`, `/api/payments`, `/api/announcements`, `/api/house-rules` | Allowed | Allowed |
 | `POST`/`PUT`/`DELETE` on `/api/rooms`, `/api/tenants`, `/api/payments` | Allowed | Denied (403), nothing written |
-| Sign in to the boarder app (Expo) | Denied | Allowed |
+| Sign in to the boarder app (Expo or Laravel tenant portal) | Denied | Allowed |
 | Register a new account through the app | Not exposed | Allowed, always as `tenant` |
 
 ### How each rule is enforced
 
-Authentication and authorization are separate steps. `auth:sanctum` proves a bearer token belongs to a real account, and the custom middleware in `app/Http/Middleware/` then decides whether that account's role may enter:
+Authentication and authorization are separate steps. `auth:sanctum` authenticates API tokens, and session `auth` authenticates browser sessions. The single custom `CheckRole` middleware checks the authenticated account's role. Its `role` alias accepts one or more roles (`role:admin`, `role:tenant`, or `role:admin,tenant`) and is registered in Laravel 10's `app/Http/Kernel.php`. Admin routes use `auth,role:admin`; tenant pages use `auth,role:tenant`; the shared rooms page uses `auth,role:admin,tenant`. JSON denials return 403 JSON, while browser role denials return HTTP 403.
 
-- `AdminMiddleware` allows only `role === 'admin'`, returning 401 when there is no authenticated user and 403 otherwise.
-- `CheckRole` accepts a list of permitted roles, so `role:admin,tenant` opens a route to both.
-- Both are registered as the aliases `admin` and `role` in the `$middlewareAliases` array of `app/Http/Kernel.php`.
-- The admin panel checks the role inside `Auth::attempt`, so a tenant with a correct password is still refused at the door.
+The mobile app continues using the JSON API and bearer tokens. In Expo, directly opening `/admin/dashboard` checks `GET /api/admin/overview`: guests receive 401 with a tenant-login prompt; a tenant receives 403 and an access-denied screen. This is separate from the Laravel session portal on port 8000, where `/tenant/login` followed by `/admin/dashboard` tests the browser middleware directly.
 
-Two rows of the table are conventions in the app rather than server-side rules, and it is worth stating that plainly: the boarder read endpoints are protected by `auth:sanctum` alone, because the phone authenticates as a tenant and must be able to see the house records, and the "an admin cannot sign in to the boarder app" check runs in the login screen instead of the API.
-
-The captured authorization transcript for every row above, and the script that regenerates it, are in [`evidence/`](evidence/README.md).
+The API authorization transcript and capture script are in [`evidence/`](evidence/README.md). Browser route checks are covered by `backend/tests/Feature/RoleAccessTest.php`.
 
 ## Laboratory Activity 2 — RBAC
 
@@ -79,12 +114,9 @@ The captured authorization transcript for every row above, and the script that r
 
 **Boarding House Management System — Role-Based Access Control.** One MySQL database serves two applications: a Laravel admin panel that the staff use to keep the house, and an Expo (React Native) app the boarders use on their phones. Activity 2 gives that system two roles, `admin` and `tenant`, protects the routes each role is entitled to, and proves the protection with captured requests that were allowed and requests that were refused.
 
-### Selected approach: both, by route
+### Selected approach: dynamic role middleware
 
-The handout offers Option A, a dynamic middleware that takes a role list, and Option B, a manual middleware with the role written into the class. This project implemented both, because the two fit different routes:
-
-- **Option B, manual — `AdminMiddleware`, alias `admin`.** Used wherever only staff belong: the whole admin panel, and the API endpoints that write. Reading `->middleware('admin')` on a route says everything, and the admin surface reads better as a word than as a list of one.
-- **Option A, dynamic — `CheckRole`, alias `role`.** Used wherever the permitted set is not exactly "admins": `role:tenant` for a boarder's own record, `role:admin,tenant` for the house list both roles read. A second role would be added to the route, not to the class.
+The project uses the handout's Option A only. `CheckRole` accepts the allowed roles on each route (`role:admin`, `role:tenant`, or `role:admin,tenant`), and the single `role` alias is registered in Laravel 10's `app/Http/Kernel.php`. The manual `AdminMiddleware` and its alias have been removed. Do not copy Laravel 11/12's `bootstrap/app.php` alias setup into this Laravel 10 project.
 
 ### Role-and-permission table
 
@@ -93,33 +125,32 @@ The same rows as the [Roles and permissions](#roles-and-permissions) table above
 | Capability | Admin | Tenant | Guest | Enforced by |
 |---|---|---|---|---|
 | Sign in to the admin panel | Allowed | Denied | form only | `Admin\AuthController` — `role` is part of the `Auth::attempt` credentials |
-| Admin dashboard and every `/admin/*` page | Allowed | Denied | 302 to login | `auth` on the web group; the role was already settled at sign-in, so a tenant never has a panel session to spend |
-| Create, edit, delete records on the panel | Allowed | Denied | 302 | same group |
-| `GET /api/admin/overview` | 200 | 403 | 401 | `auth:sanctum` + `admin` |
+| Admin dashboard and every `/admin/*` page/action | Allowed | 403 | 302 to admin login | `auth` + `role:admin` on the web group |
+| Tenant session dashboard | 403 | Allowed | 302 to tenant login | `auth` + `role:tenant` |
+| Shared `/house/rooms` page | 200 | 200 | 302 to admin login | `auth` + `role:admin,tenant` |
+| `GET /api/admin/overview` | 200 | 403 | 401 | `auth:sanctum` + `role:admin` |
 | `GET /api/tenant/summary` | 403 | 200 | 401 | `auth:sanctum` + `role:tenant` |
 | `GET /api/house/rooms` | 200 | 200 | 401 | `auth:sanctum` + `role:admin,tenant` |
-| `POST` `/api/rooms`, `/api/tenants`, `/api/payments` | 201 | 403, nothing written | 401 | `auth:sanctum` + `admin` |
-| `PUT`/`DELETE` on those three resources | 200 | 403, nothing written | 401 | `auth:sanctum` + `admin` |
+| `POST` `/api/rooms`, `/api/tenants`, `/api/payments` | 201 | 403, nothing written | 401 | `auth:sanctum` + `role:admin` |
+| `PUT`/`DELETE` on those three resources | 200 | 403, nothing written | 401 | `auth:sanctum` + `role:admin` |
 | `PUT /api/tenants/{id}` — a boarder's own contact details | 200 | 200 on their own row, 403 on anyone else's | 401 | `auth:sanctum`, ownership checked inside `Api\TenantController::update` |
 | `/api/me`, `/api/rooms`, `/api/payments`, `/api/announcements`, `/api/house-rules` | 200 | 200 | 401 | `auth:sanctum` alone — see *Limits* below |
 | Register a new account | not exposed | Allowed, always `tenant` | — | `Api\AuthController::register` hard-codes the role |
 
 ### Middleware classes, aliases, and what they protect
 
-| Class | Alias | Parameters | Routes and actions protected |
-|---|---|---|---|
-| `app/Http/Middleware/AdminMiddleware.php` | `admin` | none — the role is written into the class | `GET /api/admin/overview`; `POST`, `PUT`, `DELETE` on `/api/rooms`, `/api/tenants`, `/api/payments` |
-| `app/Http/Middleware/CheckRole.php` | `role` | a list: `role:tenant`, `role:admin,tenant` | `GET /api/tenant/summary`; `GET /api/house/rooms` |
-| `app/Http/Kernel.php` | — | — | registers both in `$middlewareAliases` |
-| `routes/api.php` | — | — | applies them, in a second group so the boarder reads stay open |
+| Component | Alias / parameters | Routes and actions protected |
+|---|---|---|
+| `app/Http/Middleware/CheckRole.php` | `role:admin`, `role:tenant`, `role:admin,tenant` | Admin web panel and write APIs; tenant web portal and summary API; shared house rooms |
+| `app/Http/Kernel.php` | registers `role` | Laravel 10 middleware alias registration |
+| `routes/web.php` | `auth` + `role` | Session authentication and role checks on browser pages/actions |
+| `routes/api.php` | `auth:sanctum` + `role` | Token authentication and role checks on restricted API routes |
 
-Neither alias is on the `/admin/*` web group. That group is gated by `auth` alone, because the role was already decided inside `Auth::attempt` when the session was created — a tenant cannot obtain a panel session to spend on it. The aliases guard the JSON API, where every caller presents a token and the server has to decide again on each request.
-
-Laravel 10 reads aliases from the `$middlewareAliases` property of `app/Http/Kernel.php`. The handout's `bootstrap/app.php` snippet is Laravel 11 and 12 syntax; pasted here it would parse fine and do nothing.
+Laravel 10 reads aliases from the `$middlewareAliases` property of `app/Http/Kernel.php`. The handout's `bootstrap/app.php` snippet is later-version syntax and does not apply to this project.
 
 ### How the middleware authorizes a request
 
-`auth:sanctum` runs first and answers a different question: it resolves the bearer token to a `User` row and attaches it to the request, or stops there with a 401. The alias middleware then answers the authorization question by reading `$request->user()->role` — `AdminMiddleware` compares it against the single string `'admin'`, and `CheckRole` compares it against the parameters passed on the route with a strict `in_array`. A mismatch returns 403 with the caller's own role echoed back in the body, and both classes also return 401 when no user is present, so neither has to assume it was paired with `auth:sanctum`. The decision happens before the controller method is entered, which is why the denied write requests in the transcript leave the tables byte-for-byte unchanged rather than half-applying a change. Hiding a button is not authorization: the phone, Postman and `curl` all reach the same route, and only the middleware is in the way.
+The authentication middleware runs first and identifies the account from either a session or a Sanctum token. `CheckRole` then compares `$request->user()->role` against the route's allowed roles with strict matching. A mismatch returns 403 before the controller runs; JSON callers receive a structured response and browser callers receive Laravel's 403 page. Hiding a button is not authorization: the browser, phone, Postman and `curl` can all name a route directly, so the server must enforce every restriction.
 
 ### Evidence screenshots
 
@@ -129,18 +160,26 @@ The handout asks for five captures. This project has six, because the panel refu
 |---|---|---|
 | `01-admin-allowed.png` | [01-admin-allowed.png](evidence/screenshots/01-admin-allowed.png) | Staff dashboard, signed in as an admin |
 | `02-other-role-allowed.png` | [02-tenants-allowed.png](evidence/screenshots/02-tenants-allowed.png) | Boarder dashboard in the phone app, signed in as a boarder |
-| `03-role-denied.png` | [03-admin-role-denied.png](evidence/screenshots/03-admin-role-denied.png) | A boarder's correct password refused at the panel door |
+| `03-role-denied.png` | Needs a refreshed capture | A logged-in tenant opening `/admin/dashboard` and receiving HTTP 403 |
 | `04-guest-blocked.png` | [06-guest-blocked.png](evidence/screenshots/06-guest-blocked.png) | Where a logged-out request to `/admin/dashboard` ends up |
 | `05-restricted-action-denied.png` | [05-restricted-action-denied.png](evidence/screenshots/05-restricted-action-denied.png) | A create the server rejects, with the rooms table unchanged |
 | *(extra)* | [04-tenants-role-denied.png](evidence/screenshots/04-tenants-role-denied.png) | The reverse of 03: a staff account turned away by the boarder app |
 
-The role-based form of 05 — a boarder token attempting a write and getting 403 — is an API call rather than a page, so it cannot be photographed. It is Part 4 of [evidence/rbac-matrix.txt](evidence/rbac-matrix.txt). [evidence/screenshots/README.md](evidence/screenshots/README.md) names the code behind each refusal.
+The existing screenshot set predates the session-based tenant portal and direct web-route role checks. Replace the old tenant-denial image with a capture of a logged-in tenant opening `/admin/dashboard` and receiving 403 before submitting the lab. The role-based API write denial remains recorded in Part 4 of [evidence/rbac-matrix.txt](evidence/rbac-matrix.txt).
 
 ### Reflection
 
-The hard part was not writing the middleware; it was working out which routes must *not* be wrapped. The boarder app reads the room list, the payments and the announcements, so guarding those reads with `admin` would have blanked five phone screens — the line had to be drawn at writes, and that took longer to see than the code took to write. A second trap was route order: `PUT /api/tenants/{id}` lets a boarder edit their own phone number, so putting the same path and verb in the admin group as well would have let the first registration shadow the second and quietly break the app. Third, Laravel answers a failed request with a 302 redirect instead of a 403 unless the caller sends `Accept: application/json`, which made a correctly-guarded route look like a broken one for a while. Server-side authorization is necessary because the client is not trustworthy and is not even singular here — the panel, the phone and Postman all hit the same routes, and a hidden button or a client-side check stops only the person who does not know the URL. Anyone with a boarder token can name `POST /api/rooms` directly, so the only enforcement that matters is the one that runs after the request arrives and before the controller does.
+The hard part was not writing the middleware; it was working out which routes must *not* be wrapped. The boarder app reads the room list, payments and announcements, so guarding those reads with `admin` would have broken phone screens — the line had to be drawn at writes. A second trap was route order: `PUT /api/tenants/{id}` lets a boarder edit their own phone number, so registering the same path and verb in the admin group would have shadowed it. Guests are redirected to the matching browser login page, while an authenticated user with the wrong role receives 403. Server-side authorization is necessary because the browser, phone and Postman all reach the same routes, and a hidden button or client-side check does not stop someone from entering a URL directly.
 
 ### Running the tests
+
+Run the backend feature suite from the backend directory:
+
+```
+php artisan test
+```
+
+This includes focused checks for the tenant session surviving a direct dashboard request, guests being redirected, tenants being denied admin pages/actions, and both roles reaching the shared house page.
 
 From the repository root with the backend serving on `127.0.0.1:8000`, and with the two account passwords in the environment — neither script stores a password, and neither writes one to the transcript:
 

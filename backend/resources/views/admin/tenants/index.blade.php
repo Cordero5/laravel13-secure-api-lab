@@ -90,7 +90,7 @@
 
                 <form action="{{ route('admin.tenants.destroy', $tenant->id) }}" method="POST"
                     class="d-inline"
-                    onsubmit="return confirm('Delete tenant {{ $tenant->name }}?');">
+                    onsubmit="return confirm('Delete tenant {{ $tenant->name }} and their tenant account?');">
                     @csrf
                     @method('DELETE')
                     <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>

@@ -1,28 +1,34 @@
 import React, { useEffect, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import API from '../services/api';
-import { C, S } from '../theme';
-import { Card, EmptyState, Loader, Screen } from '../components/bh';
+import API from '../../services/api';
+import { C, S } from '../../theme';
+import { Card, EmptyState, Loader, Screen } from '../../components/bh';
 
 export default function HouseRulesScreen() {
   const [rules, setRules] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchRules();
-  }, []);
+    let active = true;
 
-  const fetchRules = async () => {
-    try {
-      const response = await API.get('/house-rules');
-      setRules(response.data);
-    } catch (error) {
-      console.error('Failed to fetch house rules:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const fetchRules = async () => {
+      try {
+        const response = await API.get('/house-rules');
+        if (active) setRules(response.data);
+      } catch (error) {
+        console.error('Failed to fetch house rules:', error);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    void fetchRules();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const renderItem = ({ item, index }: { item: Record<string, any>; index: number }) => (
     <Card style={styles.card}>
